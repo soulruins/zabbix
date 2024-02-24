@@ -1,0 +1,496 @@
+zabbix_export:
+  version: '6.4'
+  template_groups:
+    - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
+      name: Templates/Applications
+  templates:
+    - uuid: 755251f224984459a760e9a00dcda921
+      template: LibreHardwareMonitor
+      name: LibreHardwareMonitor
+      description: '0.1'
+      groups:
+        - name: Templates/Applications
+      items:
+        - uuid: 96b986203d4e412b9e30ab0ae24ee077
+          name: 'LibreHardwareMonitor proc num'
+          key: 'proc.num[LibreHardwareMonitor.exe]'
+          history: 7d
+          triggers:
+            - uuid: a53a3314f01249979b2a7df98d526233
+              expression: 'last(/LibreHardwareMonitor/proc.num[LibreHardwareMonitor.exe])=0'
+              name: 'LibreHardwareMonitor: Process not running'
+              priority: WARNING
+              tags:
+                - tag: scope
+                  value: availability
+        - uuid: d938f2ed595c4eb1a188af0c644ea55a
+          name: 'detect sensors'
+          key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+          trends: '0'
+          value_type: TEXT
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          tags:
+            - tag: component
+              value: raw
+          triggers:
+            - uuid: 5ca4f78511d54a1f9707da915cfb795e
+              expression: 'nodata(/LibreHardwareMonitor/wmi.getall[root/LibreHardwareMonitor,select * from Sensor],5m)=1'
+              name: 'LibreHardwareMonitor: Failed to fetch info data'
+              event_name: 'LibreHardwareMonitor: Failed to fetch info data (or no data for 30m)'
+              priority: WARNING
+              description: 'Zabbix has not received data for items for the last 5 minutes'
+              dependencies:
+                - name: 'LibreHardwareMonitor: Process not running'
+                  expression: 'last(/LibreHardwareMonitor/proc.num[LibreHardwareMonitor.exe])=0'
+              tags:
+                - tag: scope
+                  value: availability
+      discovery_rules:
+        - uuid: 89677023a66349a3a95a246a642b94e3
+          name: 'Clock sensors discovery'
+          type: DEPENDENT
+          key: clock.sensors.discovery
+          delay: '0'
+          filter:
+            conditions:
+              - macro: '{#SENSORTYPE}'
+                value: Clocks
+                formulaid: A
+          item_prototypes:
+            - uuid: 0da851cfd1b94450b8eab8e11ba1bbb9
+              name: '{#SENSORNAME} ({#SENSORPARENT}): {#SENSORTYPE}'
+              type: DEPENDENT
+              key: 'clocks.sensor["{#SENSORPATH}"]'
+              delay: '0'
+              history: 7d
+              value_type: FLOAT
+              units: MHz
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.InstanceId == "{#SENSORID}")].Value.first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+              tags:
+                - tag: component
+                  value: clocks
+                - tag: sensor
+                  value: '{#SENSORPARENT}'
+          master_item:
+            key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  output = JSON.parse(value).map(function(sensor){
+                      return {
+                          "{#SENSORID}": sensor.InstanceId,
+                          "{#SENSORPATH}": sensor.Identifier,
+                          "{#SENSORNAME}": sensor.Name,
+                          "{#SENSORTYPE}": sensor.SensorType,
+                          "{#SENSORPARENT}": sensor.Parent
+                      }})
+                  return JSON.stringify({"data": output})
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+        - uuid: 46b6b46c5f1248839df2bdc5a5643afa
+          name: 'Controls sensors discovery'
+          type: DEPENDENT
+          key: controls.sensors.discovery
+          delay: '0'
+          filter:
+            conditions:
+              - macro: '{#SENSORTYPE}'
+                value: Controls
+                formulaid: A
+          item_prototypes:
+            - uuid: 2820ffb3816147a7a6d20bec5bdaccac
+              name: '{#SENSORNAME} ({#SENSORPARENT}): {#SENSORTYPE}'
+              type: DEPENDENT
+              key: 'controls.sensor["{#SENSORPATH}"]'
+              delay: '0'
+              history: 7d
+              value_type: FLOAT
+              units: '%'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.InstanceId == "{#SENSORID}")].Value.first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+              tags:
+                - tag: component
+                  value: controls
+                - tag: sensor
+                  value: '{#SENSORPARENT}'
+          master_item:
+            key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  output = JSON.parse(value).map(function(sensor){
+                      return {
+                          "{#SENSORID}": sensor.InstanceId,
+                          "{#SENSORPATH}": sensor.Identifier,
+                          "{#SENSORNAME}": sensor.Name,
+                          "{#SENSORTYPE}": sensor.SensorType,
+                          "{#SENSORPARENT}": sensor.Parent
+                      }})
+                  return JSON.stringify({"data": output})
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+        - uuid: 458e4fec24cb4a1d9dac97da36e3ba75
+          name: 'Data sensors discovery'
+          type: DEPENDENT
+          key: data.sensors.discovery
+          delay: '0'
+          filter:
+            conditions:
+              - macro: '{#SENSORTYPE}'
+                value: Data
+                formulaid: A
+          item_prototypes:
+            - uuid: 04c836961c9449e2ad9fa479a9856ffa
+              name: '{#SENSORNAME} ({#SENSORPARENT}): {#SENSORTYPE}'
+              type: DEPENDENT
+              key: 'data.sensor["{#SENSORPATH}"]'
+              delay: '0'
+              history: 7d
+              value_type: FLOAT
+              units: GB
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.InstanceId == "{#SENSORID}")].Value.first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+              tags:
+                - tag: component
+                  value: data
+                - tag: sensor
+                  value: '{#SENSORPARENT}'
+          master_item:
+            key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  output = JSON.parse(value).map(function(sensor){
+                      return {
+                          "{#SENSORID}": sensor.InstanceId,
+                          "{#SENSORPATH}": sensor.Identifier,
+                          "{#SENSORNAME}": sensor.Name,
+                          "{#SENSORTYPE}": sensor.SensorType,
+                          "{#SENSORPARENT}": sensor.Parent
+                      }})
+                  return JSON.stringify({"data": output})
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+        - uuid: 61428dfe5598489a93065d4a0e0e258d
+          name: 'Fan sensors discovery'
+          type: DEPENDENT
+          key: fan.sensors.discovery
+          delay: '0'
+          filter:
+            conditions:
+              - macro: '{#SENSORTYPE}'
+                value: Fan
+                formulaid: A
+          item_prototypes:
+            - uuid: d9e30d14c8e54d53af933dc353d1cb05
+              name: '{#SENSORNAME} ({#SENSORPARENT}): {#SENSORTYPE}'
+              type: DEPENDENT
+              key: 'fan.sensor["{#SENSORPATH}"]'
+              delay: '0'
+              history: 7d
+              value_type: FLOAT
+              units: RPM
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.InstanceId == "{#SENSORID}")].Value.first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+              tags:
+                - tag: component
+                  value: fan
+                - tag: sensor
+                  value: '{#SENSORPARENT}'
+          master_item:
+            key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  output = JSON.parse(value).map(function(sensor){
+                      return {
+                          "{#SENSORID}": sensor.InstanceId,
+                          "{#SENSORPATH}": sensor.Identifier,
+                          "{#SENSORNAME}": sensor.Name,
+                          "{#SENSORTYPE}": sensor.SensorType,
+                          "{#SENSORPARENT}": sensor.Parent
+                      }})
+                  return JSON.stringify({"data": output})
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+        - uuid: 9316dc6c62e0463580afaef7e12ddf58
+          name: 'Load sensors discovery'
+          type: DEPENDENT
+          key: load.sensors.discovery
+          delay: '0'
+          filter:
+            conditions:
+              - macro: '{#SENSORTYPE}'
+                value: Load
+                formulaid: A
+          item_prototypes:
+            - uuid: 6d6b2065c5c148e8bc4519303864d971
+              name: '{#SENSORNAME} ({#SENSORPARENT}): {#SENSORTYPE}'
+              type: DEPENDENT
+              key: 'load.sensor["{#SENSORPATH}"]'
+              delay: '0'
+              history: 7d
+              value_type: FLOAT
+              units: '%'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.InstanceId == "{#SENSORID}")].Value.first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+              tags:
+                - tag: component
+                  value: load
+                - tag: sensor
+                  value: '{#SENSORPARENT}'
+          master_item:
+            key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  output = JSON.parse(value).map(function(sensor){
+                      return {
+                          "{#SENSORID}": sensor.InstanceId,
+                          "{#SENSORPATH}": sensor.Identifier,
+                          "{#SENSORNAME}": sensor.Name,
+                          "{#SENSORTYPE}": sensor.SensorType,
+                          "{#SENSORPARENT}": sensor.Parent
+                      }})
+                  return JSON.stringify({"data": output})
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+        - uuid: 39d01ef6423b49498658fd124c5498fd
+          name: 'Power sensors discovery'
+          type: DEPENDENT
+          key: power.sensors.discovery
+          delay: '0'
+          filter:
+            conditions:
+              - macro: '{#SENSORTYPE}'
+                value: Power
+                formulaid: A
+          item_prototypes:
+            - uuid: 9e5a2678166d4404bb9bc0d4d522da23
+              name: '{#SENSORNAME} ({#SENSORPARENT}): {#SENSORTYPE}'
+              type: DEPENDENT
+              key: 'power.sensor["{#SENSORPATH}"]'
+              delay: '0'
+              history: 7d
+              value_type: FLOAT
+              units: W
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.InstanceId == "{#SENSORID}")].Value.first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+              tags:
+                - tag: component
+                  value: power
+                - tag: sensor
+                  value: '{#SENSORPARENT}'
+          master_item:
+            key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  output = JSON.parse(value).map(function(sensor){
+                      return {
+                          "{#SENSORID}": sensor.InstanceId,
+                          "{#SENSORPATH}": sensor.Identifier,
+                          "{#SENSORNAME}": sensor.Name,
+                          "{#SENSORTYPE}": sensor.SensorType,
+                          "{#SENSORPARENT}": sensor.Parent
+                      }})
+                  return JSON.stringify({"data": output})
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+        - uuid: a8c2d749f20344a9abe8838ea6e382ad
+          name: 'SmallData sensors discovery'
+          type: DEPENDENT
+          key: smalldata.sensors.discovery
+          delay: '0'
+          filter:
+            conditions:
+              - macro: '{#SENSORTYPE}'
+                value: SmallData
+                formulaid: A
+          item_prototypes:
+            - uuid: a1323b407a614c65a61d3a71c83286ae
+              name: '{#SENSORNAME} ({#SENSORPARENT}): {#SENSORTYPE}'
+              type: DEPENDENT
+              key: 'smalldatasensor["{#SENSORPATH}"]'
+              delay: '0'
+              value_type: FLOAT
+              units: MB
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.InstanceId == "{#SENSORID}")].Value.first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+              tags:
+                - tag: component
+                  value: smalldata
+                - tag: sensor
+                  value: '{#SENSORPARENT}'
+          master_item:
+            key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  output = JSON.parse(value).map(function(sensor){
+                      return {
+                          "{#SENSORID}": sensor.InstanceId,
+                          "{#SENSORPATH}": sensor.Identifier,
+                          "{#SENSORNAME}": sensor.Name,
+                          "{#SENSORTYPE}": sensor.SensorType,
+                          "{#SENSORPARENT}": sensor.Parent
+                      }})
+                  return JSON.stringify({"data": output})
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+        - uuid: 93c603f506be405e9560dbcdf9d1cb3f
+          name: 'Temperature sensors discovery'
+          type: DEPENDENT
+          key: temperature.sensors.discovery
+          delay: '0'
+          filter:
+            conditions:
+              - macro: '{#SENSORTYPE}'
+                value: Temperature
+                formulaid: A
+          item_prototypes:
+            - uuid: 94e35a4e8ec34f258d0b71f5d9e2b0ec
+              name: '{#SENSORNAME} ({#SENSORPARENT}): {#SENSORTYPE}'
+              type: DEPENDENT
+              key: 'temperature.sensor["{#SENSORPATH}"]'
+              delay: '0'
+              history: 7d
+              value_type: FLOAT
+              units: °C
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.InstanceId == "{#SENSORID}")].Value.first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+              tags:
+                - tag: component
+                  value: temperature
+                - tag: sensor
+                  value: '{#SENSORPARENT}'
+          master_item:
+            key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  output = JSON.parse(value).map(function(sensor){
+                      return {
+                          "{#SENSORID}": sensor.InstanceId,
+                          "{#SENSORPATH}": sensor.Identifier,
+                          "{#SENSORNAME}": sensor.Name,
+                          "{#SENSORTYPE}": sensor.SensorType,
+                          "{#SENSORPARENT}": sensor.Parent
+                      }})
+                  return JSON.stringify({"data": output})
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+        - uuid: 327a6f69d12841e8b5dd70a624c6748b
+          name: 'Voltage sensors discovery'
+          type: DEPENDENT
+          key: voltage.sensors.discovery
+          delay: '0'
+          filter:
+            conditions:
+              - macro: '{#SENSORTYPE}'
+                value: Voltage
+                formulaid: A
+          item_prototypes:
+            - uuid: b222fce6234d4a3983766585b7438b22
+              name: '{#SENSORNAME} ({#SENSORPARENT}): {#SENSORTYPE}'
+              type: DEPENDENT
+              key: 'voltage.sensor["{#SENSORPATH}"]'
+              delay: '0'
+              history: 7d
+              value_type: FLOAT
+              units: V
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.InstanceId == "{#SENSORID}")].Value.first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+              tags:
+                - tag: component
+                  value: voltage
+                - tag: sensor
+                  value: '{#SENSORPARENT}'
+          master_item:
+            key: 'wmi.getall[root/LibreHardwareMonitor,select * from Sensor]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  output = JSON.parse(value).map(function(sensor){
+                      return {
+                          "{#SENSORID}": sensor.InstanceId,
+                          "{#SENSORPATH}": sensor.Identifier,
+                          "{#SENSORNAME}": sensor.Name,
+                          "{#SENSORTYPE}": sensor.SensorType,
+                          "{#SENSORPARENT}": sensor.Parent
+                      }})
+                  return JSON.stringify({"data": output})
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+      tags:
+        - tag: class
+          value: software
+        - tag: target
+          value: librehardwaremonitor
